@@ -2,6 +2,7 @@ package log_annotations
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,10 @@ const (
 	negate    = "negate"
 	match     = "after"
 	paths     = "paths"
+
+	logzToken = "logzToken"
+	logzCodec = "logzCodec"
+	env       = "env"
 
 	default_prefix = "io.collectbeat.logs"
 
@@ -83,6 +88,10 @@ func (l *PodLogAnnotationBuilder) BuildModuleConfigs(obj interface{}) []*dcommon
 	}
 
 	ns := l.getNamespace(pod)
+	logzToken := l.getLogzToken(pod)
+	logzCodec := l.getLogzCodec(pod)
+	logzEnv := l.getLogzEnv(pod)
+
 	for _, container := range pod.Status.ContainerStatuses {
 		name := container.Name
 		meta := dcommon.Meta{}
@@ -127,6 +136,8 @@ func (l *PodLogAnnotationBuilder) BuildModuleConfigs(obj interface{}) []*dcommon
 			meta[cid] = paths
 		}
 		setNamespace(ns, containerConfig)
+		setLogzFields(logzToken, logzCodec, logzEnv, containerConfig)
+
 		if cmeta != nil {
 			kubecommon.SetKubeMetadata(cmeta, containerConfig)
 		}
@@ -149,6 +160,29 @@ func (l *PodLogAnnotationBuilder) getNamespace(pod *kubernetes.Pod) string {
 	}
 
 	return ns
+}
+
+func (l *PodLogAnnotationBuilder) getLogzToken(pod *kubernetes.Pod) string {
+	token := kubecommon.GetAnnotationWithPrefix(logzToken, l.prefix, pod)
+	if token == "" {
+		// Allows passing in the logz.io token as an env variable so it can be stored as a Kubernetes secret
+		return os.Getenv("LOGZ_TOKEN")
+	}
+
+	return token
+}
+
+func (l *PodLogAnnotationBuilder) getLogzCodec(pod *kubernetes.Pod) string {
+	logzCodec := l.getAnnotationWithPrefixForContainer(logzCodec, l.prefix, pod)
+	if logzCodec == "" {
+		return "json"
+	}
+
+	return logzCodec
+}
+
+func (l *PodLogAnnotationBuilder) getLogzEnv(pod *kubernetes.Pod) string {
+	return l.getAnnotationWithPrefixForContainer(env, l.prefix, pod)
 }
 
 func (l *PodLogAnnotationBuilder) getPattern(pod *kubernetes.Pod, container string) string {
@@ -217,6 +251,21 @@ func setNamespace(ns string, config common.MapStr) {
 		}
 		config["fields_under_root"] = true
 	}
+}
+
+func setLogzFields(logzToken string, logzCodec string, logzEnv string, config common.MapStr) {
+	if _, ok := config["fields"]; !ok {
+		config["fields"] = common.MapStr{
+			"logzToken": logzToken,
+			"logzCodec": logzCodec,
+			"logzEnv":   logzEnv,
+		}
+	} else {
+		config["fields"].(common.MapStr)["logzToken"] = logzToken
+		config["fields"].(common.MapStr)["logzCodec"] = logzCodec
+		config["fields"].(common.MapStr)["logzEnv"] = logzEnv
+	}
+	config["fields_under_root"] = true
 }
 
 func setMultilineConfig(config common.MapStr, pattern string, negate bool, match string) {
