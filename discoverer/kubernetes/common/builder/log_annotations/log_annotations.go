@@ -24,9 +24,8 @@ const (
 	match     = "after"
 	paths     = "paths"
 
-	logzToken = "logzToken"
 	logzCodec = "logzCodec"
-	env       = "env"
+	logzEnv   = "logzEnv"
 
 	default_prefix = "io.collectbeat.logs"
 
@@ -88,9 +87,9 @@ func (l *PodLogAnnotationBuilder) BuildModuleConfigs(obj interface{}) []*dcommon
 	}
 
 	ns := l.getNamespace(pod)
-	logzToken := l.getLogzToken(pod)
-	logzCodec := l.getLogzCodec(pod)
-	logzEnv := l.getLogzEnv(pod)
+	token := l.getLogzToken(pod)
+	codec := l.getLogzCodec(pod)
+	env := l.getLogzEnv(pod)
 
 	for _, container := range pod.Status.ContainerStatuses {
 		name := container.Name
@@ -136,7 +135,7 @@ func (l *PodLogAnnotationBuilder) BuildModuleConfigs(obj interface{}) []*dcommon
 			meta[cid] = paths
 		}
 		setNamespace(ns, containerConfig)
-		setLogzFields(logzToken, logzCodec, logzEnv, containerConfig)
+		setLogzFields(token, codec, env, containerConfig)
 
 		if cmeta != nil {
 			kubecommon.SetKubeMetadata(cmeta, containerConfig)
@@ -163,13 +162,7 @@ func (l *PodLogAnnotationBuilder) getNamespace(pod *kubernetes.Pod) string {
 }
 
 func (l *PodLogAnnotationBuilder) getLogzToken(pod *kubernetes.Pod) string {
-	token := kubecommon.GetAnnotationWithPrefix(logzToken, l.prefix, pod)
-	if token == "" {
-		// Allows passing in the logz.io token as an env variable so it can be stored as a Kubernetes secret
-		return os.Getenv("LOGZ_TOKEN")
-	}
-
-	return token
+	return os.Getenv("LOGZ_TOKEN")
 }
 
 func (l *PodLogAnnotationBuilder) getLogzCodec(pod *kubernetes.Pod) string {
@@ -182,7 +175,7 @@ func (l *PodLogAnnotationBuilder) getLogzCodec(pod *kubernetes.Pod) string {
 }
 
 func (l *PodLogAnnotationBuilder) getLogzEnv(pod *kubernetes.Pod) string {
-	return l.getAnnotationWithPrefixForContainer(env, l.prefix, pod)
+	return l.getAnnotationWithPrefixForContainer(logzEnv, l.prefix, pod)
 }
 
 func (l *PodLogAnnotationBuilder) getPattern(pod *kubernetes.Pod, container string) string {
@@ -253,17 +246,17 @@ func setNamespace(ns string, config common.MapStr) {
 	}
 }
 
-func setLogzFields(logzToken string, logzCodec string, logzEnv string, config common.MapStr) {
+func setLogzFields(token string, codec string, env string, config common.MapStr) {
 	if _, ok := config["fields"]; !ok {
 		config["fields"] = common.MapStr{
-			"logzToken": logzToken,
-			"logzCodec": logzCodec,
-			"logzEnv":   logzEnv,
+			"logzToken": token,
+			"logzCodec": codec,
+			"logzEnv":   env,
 		}
 	} else {
-		config["fields"].(common.MapStr)["logzToken"] = logzToken
-		config["fields"].(common.MapStr)["logzCodec"] = logzCodec
-		config["fields"].(common.MapStr)["logzEnv"] = logzEnv
+		config["fields"].(common.MapStr)["logzToken"] = token
+		config["fields"].(common.MapStr)["logzCodec"] = codec
+		config["fields"].(common.MapStr)["logzEnv"] = env
 	}
 	config["fields_under_root"] = true
 }
