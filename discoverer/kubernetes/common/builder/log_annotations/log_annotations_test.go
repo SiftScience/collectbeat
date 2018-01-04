@@ -43,6 +43,21 @@ func TestLogAnnotationBuilder(t *testing.T) {
 			},
 			length: 2,
 		},
+		{
+			annotations: map[string]interface{}{
+				"foo/logzCodec": "json",
+				"foo/logzEnv":   "prod",
+			},
+			length: 2,
+		},
+		{
+			annotations: map[string]interface{}{
+				"foo/pattern":   "bar",
+				"foo/logzCodec": "json",
+				"foo/logzEnv":   "prod",
+			},
+			length: 2,
+		},
 	}
 
 	for _, test := range tests {
@@ -140,4 +155,19 @@ func TestProspectorConfig(t *testing.T) {
 	assert.Equal(t, confs[1].Config["paths"], []string{"/var/456/*.log"})
 	assert.Equal(t, confs[1].Config["multiline"], multilineCfg["multiline"])
 
+	logzCfg := common.MapStr{}
+	logzExpectedCfg := common.MapStr{
+		"logzToken": "ABC123",
+		"logzCodec": "json",
+		"logzEnv":   "prod",
+	}
+	setLogzFields("ABC123", "json", "prod", logzCfg)
+	assert.Equal(t, logzExpectedCfg, logzCfg["fields"])
+
+	logzCfg["fields"] = common.MapStr{
+		"namespace": "abc",
+	}
+	logzExpectedCfg["namespace"] = "abc"
+	setLogzFields("ABC123", "json", "prod", logzCfg)
+	assert.Equal(t, logzExpectedCfg, logzCfg["fields"])
 }
